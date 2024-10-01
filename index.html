@@ -7,13 +7,44 @@
     <style>
       body {
         margin: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
       }
       canvas {
+        display: block;
+      }
+      #controls {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(255, 255, 255, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+      }
+      label {
         display: block;
       }
     </style>
   </head>
   <body>
+    <div id="controls">
+      <label>
+        Rotate X:
+        <input type="range" id="rotateX" min="-180" max="180" value="0" />
+      </label>
+      <label>
+        Rotate Y:
+        <input type="range" id="rotateY" min="-180" max="180" value="0" />
+      </label>
+      <label>
+        Rotate Z:
+        <input type="range" id="rotateZ" min="-180" max="180" value="0" />
+      </label>
+    </div>
+    <script src=" https://cdn.jsdelivr.net/npm/stats-js@1.0.1/build/stats.min.js "></script>
     <!-- Import Map to define paths for Three.js and its addons -->
     <script type="importmap">
       {
@@ -28,6 +59,18 @@
       import * as THREE from "three";
       import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
       import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+      // MS Panel
+      const statsMS = new Stats();
+      statsMS.showPanel(1); // MS
+      statsMS.dom.style.cssText = "position:absolute;top:0px;right:0px;";
+      document.body.appendChild(statsMS.dom);
+
+      // FPS Panel
+      const statsFPS = new Stats();
+      statsFPS.showPanel(0); // FPS
+      statsFPS.dom.style.cssText = "position:absolute;top:0px;right:80px;";
+      document.body.appendChild(statsFPS.dom);
 
       // Scene setup
       const scene = new THREE.Scene();
@@ -49,12 +92,17 @@
       directionalLight.position.set(5, 10, 7.5).normalize();
       scene.add(directionalLight);
 
+      let model;
+
       // Load GLTF model
       const loader = new GLTFLoader();
       loader.load(
-        "https://jason9075.github.io/model_viewer_web/gltf_duck/Duck.gltf",
+        "gltf_duck/Duck.gltf",
+        //"https://jason9075.github.io/model_viewer_web/gltf_duck/Duck.gltf",
         function (gltf) {
-          scene.add(gltf.scene);
+          model = gltf.scene;
+          scene.add(model);
+          resetRotation();
         },
         undefined,
         function (error) {
@@ -68,11 +116,64 @@
       const controls = new OrbitControls(camera, renderer.domElement);
       controls.update();
 
+      const rotateX = document.getElementById("rotateX");
+      const rotateY = document.getElementById("rotateY");
+      const rotateZ = document.getElementById("rotateZ");
+
+      // Set initial slider values to zero
+      rotateX.value = "0";
+      rotateY.value = "0";
+      rotateZ.value = "0";
+
+      let worldRotationX = 0;
+      let worldRotationY = 0;
+      let worldRotationZ = 0;
+
+      const worldQuaternionX = new THREE.Quaternion();
+      const worldQuaternionY = new THREE.Quaternion();
+      const worldQuaternionZ = new THREE.Quaternion();
+
+      // Reset the model's rotation
+      function resetRotation() {
+        if (model) {
+          model.matrix.identity();
+          model.matrixAutoUpdate = false;
+        }
+      }
+
+      function updateRotation() {
+        if (model) {
+          const x = THREE.MathUtils.degToRad(rotateX.value);
+          const y = THREE.MathUtils.degToRad(rotateY.value);
+          const z = THREE.MathUtils.degToRad(rotateZ.value);
+
+          model.matrix.identity();
+          model.matrixAutoUpdate = false;
+
+          const rotX = new THREE.Matrix4().makeRotationX(x);
+          const rotY = new THREE.Matrix4().makeRotationY(y);
+          const rotZ = new THREE.Matrix4().makeRotationZ(z);
+
+          model.matrix.multiply(rotZ).multiply(rotY).multiply(rotX);
+        }
+      }
+
+      rotateX.addEventListener("input", updateRotation);
+      rotateY.addEventListener("input", updateRotation);
+      rotateZ.addEventListener("input", updateRotation);
+
       // Render loop
       function animate() {
-        requestAnimationFrame(animate);
+        statsFPS.begin();
+        statsMS.begin();
+
         controls.update();
         renderer.render(scene, camera);
+
+        statsFPS.end();
+        statsMS.end();
+
+        requestAnimationFrame(animate);
       }
 
       animate();
