@@ -6,6 +6,7 @@ in pkgs.mkShell {
     pkgs.nodejs
     pkgs.entr
     pkgs.nodePackages.typescript
+    pkgs.nodePackages.typescript-language-server
     pkgs.nodePackages.npm
     pkgs.nodePackages.http-server
   ];

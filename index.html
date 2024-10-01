@@ -1,48 +1,33 @@
 <!doctype html>
 <html lang="en">
-  <head>
+
+<head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Three.js Model Viewer</title>
-    <style>
-      body {
-        margin: 0;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        height: 100vh;
-      }
-      canvas {
-        display: block;
-      }
-      #controls {
-        position: absolute;
-        top: 10px;
-        left: 10px;
-        background: rgba(255, 255, 255, 0.8);
-        padding: 10px;
-        border-radius: 5px;
-      }
-      label {
-        display: block;
-      }
-    </style>
-  </head>
-  <body>
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <link rel="stylesheet" href="style.css" />
+</head>
+
+<body>
     <div id="controls">
-      <label>
-        Rotate X:
-        <input type="range" id="rotateX" min="-180" max="180" value="0" />
-      </label>
-      <label>
-        Rotate Y:
-        <input type="range" id="rotateY" min="-180" max="180" value="0" />
-      </label>
-      <label>
-        Rotate Z:
-        <input type="range" id="rotateZ" min="-180" max="180" value="0" />
-      </label>
+        <label>
+            Rotate X:
+            <input type="range" id="rotateX" min="-180" max="180" value="0" />
+        </label>
+        <label>
+            Rotate Y:
+            <input type="range" id="rotateY" min="-180" max="180" value="0" />
+        </label>
+        <label>
+            Rotate Z:
+            <input type="range" id="rotateZ" min="-180" max="180" value="0" />
+        </label>
+        <label>
+            Number of Ducks:
+            <input type="number" id="numDucks" min="1" max="10000" value="1" />
+        </label>
+        <div id="instanceCount">Instances: 1</div>
     </div>
     <script src=" https://cdn.jsdelivr.net/npm/stats-js@1.0.1/build/stats.min.js "></script>
     <!-- Import Map to define paths for Three.js and its addons -->
@@ -56,136 +41,156 @@
     </script>
 
     <script type="module">
-      import * as THREE from "three";
-      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-      import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+        import * as THREE from "three";
+        import {GLTFLoader} from "three/addons/loaders/GLTFLoader.js";
+        import {OrbitControls} from "three/addons/controls/OrbitControls.js";
 
-      // MS Panel
-      const statsMS = new Stats();
-      statsMS.showPanel(1); // MS
-      statsMS.dom.style.cssText = "position:absolute;top:0px;right:0px;";
-      document.body.appendChild(statsMS.dom);
+        // MS Panel
+        const statsMS = new Stats();
+        statsMS.showPanel(1); // MS
+        statsMS.dom.style.cssText = "position:absolute;top:0px;right:0px;";
+        document.body.appendChild(statsMS.dom);
 
-      // FPS Panel
-      const statsFPS = new Stats();
-      statsFPS.showPanel(0); // FPS
-      statsFPS.dom.style.cssText = "position:absolute;top:0px;right:80px;";
-      document.body.appendChild(statsFPS.dom);
+        // FPS Panel
+        const statsFPS = new Stats();
+        statsFPS.showPanel(0); // FPS
+        statsFPS.dom.style.cssText = "position:absolute;top:0px;right:80px;";
+        document.body.appendChild(statsFPS.dom);
 
-      // Scene setup
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(
-        75,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        1000,
-      );
-      const renderer = new THREE.WebGLRenderer();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      document.body.appendChild(renderer.domElement);
+        // Scene setup
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(
+            75,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000,
+        );
+        const renderer = new THREE.WebGLRenderer();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
 
-      // Adding lights
-      const ambientLight = new THREE.AmbientLight(0xffffff, 1);
-      scene.add(ambientLight);
+        // Adding lights
+        const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+        scene.add(ambientLight);
 
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-      directionalLight.position.set(5, 10, 7.5).normalize();
-      scene.add(directionalLight);
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(5, 10, 7.5).normalize();
+        scene.add(directionalLight);
 
-      let model;
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
 
-      // Load GLTF model
-      const loader = new GLTFLoader();
-      loader.load(
-        "gltf_duck/Duck.gltf",
-        //"https://jason9075.github.io/model_viewer_web/gltf_duck/Duck.gltf",
-        function (gltf) {
-          model = gltf.scene;
-          scene.add(model);
-          resetRotation();
-        },
-        undefined,
-        function (error) {
-          console.error(error);
-        },
-      );
+        let model = [];
+        let selectdModel = null;
 
-      camera.position.z = 5;
+        // Load GLTF model
+        const loader = new GLTFLoader();
+        let modelGLTF = null; // Cache the model
 
-      // Orbit Controls for better camera movement
-      const controls = new OrbitControls(camera, renderer.domElement);
-      controls.update();
-
-      const rotateX = document.getElementById("rotateX");
-      const rotateY = document.getElementById("rotateY");
-      const rotateZ = document.getElementById("rotateZ");
-
-      // Set initial slider values to zero
-      rotateX.value = "0";
-      rotateY.value = "0";
-      rotateZ.value = "0";
-
-      let worldRotationX = 0;
-      let worldRotationY = 0;
-      let worldRotationZ = 0;
-
-      const worldQuaternionX = new THREE.Quaternion();
-      const worldQuaternionY = new THREE.Quaternion();
-      const worldQuaternionZ = new THREE.Quaternion();
-
-      // Reset the model's rotation
-      function resetRotation() {
-        if (model) {
-          model.matrix.identity();
-          model.matrixAutoUpdate = false;
+        // Function to add a new instance of the model
+        function addModelInstance(position = new THREE.Vector3()) {
+            if (modelGLTF) {
+                const model = modelGLTF.clone();
+                model.position.copy(position);
+                model.matrixAutoUpdate = false;
+                scene.add(model);
+                models.push(model);
+            }
         }
-      }
 
-      function updateRotation() {
-        if (model) {
-          const x = THREE.MathUtils.degToRad(rotateX.value);
-          const y = THREE.MathUtils.degToRad(rotateY.value);
-          const z = THREE.MathUtils.degToRad(rotateZ.value);
-
-          model.matrix.identity();
-          model.matrixAutoUpdate = false;
-
-          const rotX = new THREE.Matrix4().makeRotationX(x);
-          const rotY = new THREE.Matrix4().makeRotationY(y);
-          const rotZ = new THREE.Matrix4().makeRotationZ(z);
-
-          model.matrix.multiply(rotZ).multiply(rotY).multiply(rotX);
+        // Function to remove a model instance
+        function removeModelInstance() {
+            const model = models.pop();
+            if (model) {
+                scene.remove(model);
+                if (selectedModel === model) {
+                    selectedModel = null;
+                }
+            }
         }
-      }
 
-      rotateX.addEventListener("input", updateRotation);
-      rotateY.addEventListener("input", updateRotation);
-      rotateZ.addEventListener("input", updateRotation);
+        loader.load(
+            "gltf_duck/Duck.gltf",
+            function (gltf) {
+                model = gltf.scene;
+                scene.add(model);
+                resetRotation();
+            },
+            undefined,
+            function (error) {
+                console.error(error);
+            },
+        );
 
-      // Render loop
-      function animate() {
-        statsFPS.begin();
-        statsMS.begin();
+        camera.position.z = 5;
 
+        // Orbit Controls for better camera movement
+        const controls = new OrbitControls(camera, renderer.domElement);
         controls.update();
-        renderer.render(scene, camera);
 
-        statsFPS.end();
-        statsMS.end();
+        const rotateX = document.getElementById("rotateX");
+        const rotateY = document.getElementById("rotateY");
+        const rotateZ = document.getElementById("rotateZ");
 
-        requestAnimationFrame(animate);
-      }
+        // Set initial slider values to zero
+        rotateX.value = "0";
+        rotateY.value = "0";
+        rotateZ.value = "0";
 
-      animate();
+        // Reset the model's rotation
+        function resetRotation() {
+            if (model) {
+                model.matrix.identity();
+                model.matrixAutoUpdate = false;
+            }
+        }
 
-      // Handle window resize
-      window.addEventListener("resize", function () {
-        const width = window.innerWidth;
-        const height = window.innerHeight;
-        renderer.setSize(width, height);
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
-      });
+        function updateRotation() {
+            if (model) {
+                const x = THREE.MathUtils.degToRad(rotateX.value);
+                const y = THREE.MathUtils.degToRad(rotateY.value);
+                const z = THREE.MathUtils.degToRad(rotateZ.value);
+
+                model.matrix.identity();
+                model.matrixAutoUpdate = false;
+
+                const rotX = new THREE.Matrix4().makeRotationX(x);
+                const rotY = new THREE.Matrix4().makeRotationY(y);
+                const rotZ = new THREE.Matrix4().makeRotationZ(z);
+
+                model.matrix.multiply(rotZ).multiply(rotY).multiply(rotX);
+            }
+        }
+
+        rotateX.addEventListener("input", updateRotation);
+        rotateY.addEventListener("input", updateRotation);
+        rotateZ.addEventListener("input", updateRotation);
+
+        // Render loop
+        function animate() {
+            statsFPS.begin();
+            statsMS.begin();
+
+            controls.update();
+            renderer.render(scene, camera);
+
+            statsFPS.end();
+            statsMS.end();
+
+            requestAnimationFrame(animate);
+        }
+
+        animate();
+
+        // Handle window resize
+        window.addEventListener("resize", function () {
+            const width = window.innerWidth;
+            const height = window.innerHeight;
+            renderer.setSize(width, height);
+            camera.aspect = width / height;
+            camera.updateProjectionMatrix();
+        });
     </script>
-  </body>
+</body>
+
 </html>
