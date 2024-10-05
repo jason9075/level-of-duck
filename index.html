@@ -11,6 +11,7 @@
 
 <body>
     <div id="controls">
+        <div id="cameraPosition"></div>
         <label>
             Rotate X:
             <input type="range" id="rotateX" min="-180" max="180" value="0" />
@@ -23,8 +24,9 @@
             Rotate Z:
             <input type="range" id="rotateZ" min="-180" max="180" value="0" />
         </label>
+        <button id="autoAddButton">Add Until FPS 50</button>
         <label>
-            Number of Ducks:
+            Set Number of Ducks:
             <input type="number" id="numDucks" min="1" max="10000" value="1" />
         </label>
         <div id="instanceCount">Instances: 1</div>
@@ -80,8 +82,19 @@
         const raycaster = new THREE.Raycaster();
         const mouse = new THREE.Vector2();
 
-        let model = [];
-        let selectdModel = null;
+        let models = [];
+        let selectedModel = null;
+        let selectedWireframe = null;
+
+        const OFFSET = 2;
+        const Y_POS = -10;
+
+        // Auto add models until FPS drops below 50
+        let autoAdding = false;
+        let prevTime = performance.now();
+        let fps = 0;
+        const fpsHistory = [];
+        const fpsHistorySize = 10;
 
         // Load GLTF model
         const loader = new GLTFLoader();
@@ -92,7 +105,7 @@
             if (modelGLTF) {
                 const model = modelGLTF.clone();
                 model.position.copy(position);
-                model.matrixAutoUpdate = false;
+                //model.matrixAutoUpdate = false;
                 scene.add(model);
                 models.push(model);
             }
@@ -112,9 +125,9 @@
         loader.load(
             "gltf_duck/Duck.gltf",
             function (gltf) {
-                model = gltf.scene;
-                scene.add(model);
-                resetRotation();
+                modelGLTF = gltf.scene;
+                // Add the first instance of the model
+                updateInstance(1);
             },
             undefined,
             function (error) {
@@ -131,34 +144,91 @@
         const rotateX = document.getElementById("rotateX");
         const rotateY = document.getElementById("rotateY");
         const rotateZ = document.getElementById("rotateZ");
+        const numDucks = document.getElementById("numDucks");
 
         // Set initial slider values to zero
         rotateX.value = "0";
         rotateY.value = "0";
         rotateZ.value = "0";
 
+        autoAddButton.addEventListener("click", autoAddInstances);
+
+        function autoAddInstances() {
+            if (autoAdding) {
+                autoAdding = false;
+                autoAddButton.textContent = "Add Until FPS 50";
+            } else {
+                autoAdding = true;
+                autoAddButton.textContent = "Stop Adding";
+            }
+        }
+
+        function updateInstance(targetCount) {
+            const currentCount = models.length;
+            if (targetCount > currentCount) {
+                for (let i = currentCount; i < targetCount; i++) {
+                    if (models.length === 0) {
+                        addModelInstance(new THREE.Vector3(0, Y_POS, 0));
+                        continue;
+                    }
+                    const lastModel = models[models.length - 1];
+
+                    let xVal = lastModel.position.x;
+                    let zVal = lastModel.position.z;
+                    let position;
+                    if (-99 * OFFSET < zVal) {
+                        position = lastModel.position
+                            .clone()
+                            .add(new THREE.Vector3(0, 0, -OFFSET));
+                    } else {
+                        position = new THREE.Vector3(xVal - OFFSET, Y_POS, 0);
+                    }
+                    addModelInstance(position);
+                }
+            } else if (targetCount < currentCount) {
+                for (let i = currentCount; i > targetCount; i--) {
+                    removeModelInstance();
+                }
+            }
+            updateInstanceCount();
+            camera.position.x = Math.min(10, 2 + Math.sqrt(models.length));
+            camera.position.y = Math.max(8, 10 - Math.sqrt(models.length) / 3);
+            camera.position.z = Math.min(10, 2 + Math.sqrt(models.length));
+        }
+
+        function updateInstanceCount() {
+            instanceCount.textContent = `Instances: ${models.length}`;
+        }
+
+        numDucks.addEventListener("input", function () {
+            updateInstance(numDucks.value);
+        });
+
         // Reset the model's rotation
         function resetRotation() {
-            if (model) {
-                model.matrix.identity();
-                model.matrixAutoUpdate = false;
+            if (selectedModel) {
+                selectedModel.matrix.identity();
+                selectedModel.matrix.setPosition(selectedModel.position);
             }
         }
 
         function updateRotation() {
-            if (model) {
+            if (selectedModel) {
                 const x = THREE.MathUtils.degToRad(rotateX.value);
                 const y = THREE.MathUtils.degToRad(rotateY.value);
                 const z = THREE.MathUtils.degToRad(rotateZ.value);
 
-                model.matrix.identity();
-                model.matrixAutoUpdate = false;
+                // Reset the model's matrix
+                selectedModel.matrix.identity();
 
                 const rotX = new THREE.Matrix4().makeRotationX(x);
                 const rotY = new THREE.Matrix4().makeRotationY(y);
                 const rotZ = new THREE.Matrix4().makeRotationZ(z);
 
-                model.matrix.multiply(rotZ).multiply(rotY).multiply(rotX);
+                // Apply rotations in Z, Y, X order
+                selectedModel.matrix.multiply(rotZ).multiply(rotY).multiply(rotX);
+
+                selectedModel.matrix.setPosition(selectedModel.position);
             }
         }
 
@@ -166,10 +236,106 @@
         rotateY.addEventListener("input", updateRotation);
         rotateZ.addEventListener("input", updateRotation);
 
+        function selectModel(model) {
+            console.log("Selected model", model);
+
+            resetHighlight(selectedModel);
+            selectedModel = model;
+            applyHighlight(model);
+
+            rotateX.value = "0";
+            rotateY.value = "0";
+            rotateZ.value = "0";
+
+            resetRotation();
+            updateRotation();
+        }
+
+        function applyHighlight(model) {
+            // Create a new group for the wireframe
+            selectedWireframe = new THREE.Group();
+
+            // Traverse the model and create wireframe meshes
+            model.traverse((child) => {
+                if (child.isMesh) {
+                    const wireFrameMesh = child.clone();
+                    const wireframeMaterial = new THREE.LineBasicMaterial({
+                        color: 0xff0000,
+                    });
+                    wireFrameMesh.material = wireframeMaterial;
+
+                    wireFrameMesh.matrixAutoUpdate = false;
+                    wireFrameMesh.matrix.copy(child.matrixWorld);
+
+                    selectedWireframe.add(wireFrameMesh);
+                }
+            });
+
+            // Position and rotate the wireframe to match the model
+            selectedWireframe.matrixAutoUpdate = false;
+
+            console.log("model.matrix", model.matrix);
+
+            scene.add(selectedWireframe);
+        }
+
+        function resetHighlight(model) {
+            scene.remove(selectedWireframe);
+            selectedWireframe = null;
+        }
+
+        function onMouseClick(event) {
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+
+            const intersects = raycaster.intersectObjects(models, true);
+
+            if (intersects.length > 0) {
+                let selectedModel = intersects[0].object;
+
+                while (selectedModel.parent && !models.includes(selectedModel)) {
+                    selectedModel = selectedModel.parent;
+                }
+
+                if (models.includes(selectedModel)) {
+                    selectModel(selectedModel);
+                }
+            } else {
+                // Deselect the model
+                if (selectedModel) {
+                    resetHighlight(selectedModel);
+                    selectedModel = null;
+                }
+            }
+        }
+
+        window.addEventListener("click", onMouseClick, false);
+
         // Render loop
         function animate() {
             statsFPS.begin();
             statsMS.begin();
+
+            const currentTime = performance.now();
+            const deltaTime = currentTime - prevTime;
+            fps = 1000 / deltaTime;
+            prevTime = currentTime;
+
+            fpsHistory.push(fps);
+            if (fpsHistory.length > fpsHistorySize) {
+                fpsHistory.shift();
+            }
+            const avgFPS =
+                fpsHistory.reduce((sum, fps) => sum + fps, 0) / fpsHistory.length;
+
+            if (autoAdding && avgFPS > 50) {
+                updateInstance(models.length + 10);
+            } else if (autoAdding && avgFPS < 50) {
+                autoAdding = false;
+                autoAddButton.textContent = "Add Until FPS 50";
+            }
 
             controls.update();
             renderer.render(scene, camera);
@@ -178,6 +344,7 @@
             statsMS.end();
 
             requestAnimationFrame(animate);
+            cameraPosition.textContent = `Camera Position: (${camera.position.x.toFixed(2)}, ${camera.position.y.toFixed(2)}, ${camera.position.z.toFixed(2)})`;
         }
 
         animate();
