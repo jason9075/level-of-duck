@@ -24,7 +24,7 @@ The **Level of Duck Project** is an interactive 3D web application that demonstr
 
 ## Benchmark:
 
-How many ducks would make fps drop under 50?
+How many ducks would cause the FPS to drop below 50?
 
 | Device      | CPU                                 | GPU                                   | Memory | OS                    | Browser                  | With LOD<sup>1</sup> | Without LOD |
 | ----------- | ----------------------------------- | ------------------------------------- | ------ | --------------------- | ------------------------ | -------------------- | ----------- |
