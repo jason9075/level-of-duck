@@ -24,10 +24,12 @@ The **Level of Duck Project** is an interactive 3D web application that demonstr
 
 ## Benchmark:
 
-| Device      | CPU                                 | GPU                                   | Memory | OS                    | Browser                  | With LOD Score<sup>1</sup> | Without LOD Score |
-| ----------- | ----------------------------------- | ------------------------------------- | ------ | --------------------- | ------------------------ | -------------------------- | ----------------- |
-| **PC**      | AMD Ryzen 9 5950X 16-Core Processor | NVIDIA GeForce RTX 3080 Ti            | 48GB   | NixOS 24.11           | Firefox 130.0.1 (64-bit) | 3061                       | 5131              |
-| **MacBook** | Intel Core i5-7360U @ 2.3GHz        | Intel Iris Plus Graphics 640 (1536MB) | 8GB    | macOS Monterey 12.7.6 | Firefox 131.0.2 (64-bit) | 1611                       | 1811              |
+How many ducks would make fps drop under 50?
+
+| Device      | CPU                                 | GPU                                   | Memory | OS                    | Browser                  | With LOD<sup>1</sup> | Without LOD |
+| ----------- | ----------------------------------- | ------------------------------------- | ------ | --------------------- | ------------------------ | -------------------- | ----------- |
+| **PC**      | AMD Ryzen 9 5950X 16-Core Processor | NVIDIA GeForce RTX 3080 Ti            | 48GB   | NixOS 24.11           | Firefox 130.0.1 (64-bit) | 3061                 | 5131        |
+| **MacBook** | Intel Core i5-7360U @ 2.3GHz        | Intel Iris Plus Graphics 640 (1536MB) | 8GB    | macOS Monterey 12.7.6 | Firefox 131.0.2 (64-bit) | 1611                 | 1811        |
 
 _Settings for "With LOD Score": Simplify Ratio = 80%, Distance = 20_
 
